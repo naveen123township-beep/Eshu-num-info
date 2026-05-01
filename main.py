@@ -8,7 +8,9 @@ app = FastAPI()
 BIN_ID = "69eec211aaba8821973f621a"
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
 SOURCE_API = "https://api.subhxcosmo.in/api"
+SOURCE_KEY = "CYBERXZEXX"
 
+# --- GET KEYS FROM JSONBIN ---
 def get_remote_keys():
     try:
         url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest"
@@ -18,6 +20,7 @@ def get_remote_keys():
     except:
         return {}
 
+# --- MAIN API ---
 @app.get("/")
 async def get_data(key: str = Query(...), mobile: str = Query(...)):
     keys = get_remote_keys()
@@ -50,76 +53,25 @@ async def get_data(key: str = Query(...), mobile: str = Query(...)):
         }
 
     try:
-        # 🔗 REAL SOURCE CALL
+        # 🔗 CALL SOURCE API
         response = requests.get(
-            f"{SOURCE_API}?key=CYBERXZEXX&type=mobile&term={mobile}",
+            f"{SOURCE_API}?key={SOURCE_KEY}&type=mobile&term={mobile}",
             timeout=10
         )
+
         source_data = response.json()
 
-        # ✅ MODIFY ONLY OWNER + ADD DAYS
+        # 🔥 ONLY MODIFY OWNER
         source_data["owner"] = "@Eshucording contact 8123561579"
+
+        # 🔥 ADD DAYS WITHOUT BREAKING STRUCTURE
         source_data["days_remaining"] = f"{remaining_days} Days"
 
         return source_data
 
-    except:
+    except Exception as e:
         return {
             "success": False,
             "owner": "@Eshucording contact 8123561579",
             "message": "Source API Connection Error"
-    }        expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
-            tzinfo=timezone(timedelta(hours=5, minutes=30))
-        )
-        remaining_days = (expiry_date - ist_now).days + 1
-    except:
-        remaining_days = 0
-    
-    # ❌ EXPIRED KEY
-    if remaining_days <= 0:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "KEY EXPIRED TO BUY CALL 8123561579"
         }
-
-    try:
-        response = requests.get(f"{SOURCE_API}?key=ottt&mobile={mobile}", timeout=10)
-        source_data = response.json()
-
-        # ✅ NEW STRUCTURE OUTPUT
-        return {
-            "success": True,
-            "owner": "@Eshucording contact 8123561579",
-            "result": {
-                "success": True,
-                "count": source_data.get("total_records", 0),
-                "results": source_data.get("data", [])
-            },
-            "cached": False,
-            "proxyUsed": "none",
-            "attempt": 1,
-            "days_remaining": f"{remaining_days} Days"
-        }
-
-    except:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "Source API Connection Error"
-    }    if remaining_days <= 0:
-        return {"status": "error", "message": "KEY EXPIRED TO BUY CALL 8123561579", "DEVLOPER": "@Eshucording"}
-
-    try:
-        response = requests.get(f"{SOURCE_API}?key=ottt&mobile={mobile}", timeout=10)
-        source_data = response.json()
-        
-        # Exact order: Days Remaining first, Developer last
-        output = OrderedDict()
-        output["days_remaining"] = f"{remaining_days} Days"
-        output["total_records"] = source_data.get("total_records", 0)
-        output["data"] = source_data.get("data", [])
-        output["DEVLOPER"] = "@Eshucording"
-        return output
-    except:
-        return {"error": "Source API Connection Error", "DEVLOPER": "@Eshucording"}
