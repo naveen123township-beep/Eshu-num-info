@@ -7,7 +7,7 @@ app = FastAPI()
 # --- CONFIGURATION ---
 BIN_ID = "69eec211aaba8821973f621a"
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
-SOURCE_API = "https://hitackgrop-19xe.vercel.app/get_data"
+SOURCE_API = "https://api.subhxcosmo.in/api"
 
 def get_remote_keys():
     try:
@@ -21,7 +21,7 @@ def get_remote_keys():
 @app.get("/")
 async def get_data(key: str = Query(...), mobile: str = Query(...)):
     keys = get_remote_keys()
-    
+
     # ❌ INVALID KEY
     if key not in keys:
         return {
@@ -29,12 +29,46 @@ async def get_data(key: str = Query(...), mobile: str = Query(...)):
             "owner": "@Eshucording contact 8123561579",
             "message": "INVALID KEY"
         }
-    
+
     # ✅ IST TIME
     ist_now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-    
+
     try:
         expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
+            tzinfo=timezone(timedelta(hours=5, minutes=30))
+        )
+        remaining_days = (expiry_date - ist_now).days + 1
+    except:
+        remaining_days = 0
+
+    # ❌ EXPIRED KEY
+    if remaining_days <= 0:
+        return {
+            "success": False,
+            "owner": "@Eshucording contact 8123561579",
+            "message": "KEY EXPIRED TO BUY CALL 8123561579"
+        }
+
+    try:
+        # 🔗 REAL SOURCE CALL
+        response = requests.get(
+            f"{SOURCE_API}?key=CYBERXZEXX&type=mobile&term={mobile}",
+            timeout=10
+        )
+        source_data = response.json()
+
+        # ✅ MODIFY ONLY OWNER + ADD DAYS
+        source_data["owner"] = "@Eshucording contact 8123561579"
+        source_data["days_remaining"] = f"{remaining_days} Days"
+
+        return source_data
+
+    except:
+        return {
+            "success": False,
+            "owner": "@Eshucording contact 8123561579",
+            "message": "Source API Connection Error"
+    }        expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
             tzinfo=timezone(timedelta(hours=5, minutes=30))
         )
         remaining_days = (expiry_date - ist_now).days + 1
