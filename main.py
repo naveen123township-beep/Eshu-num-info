@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, Response
 import requests
-import time # Added for cache busting
+import time
 from datetime import datetime, timezone, timedelta
 
 app = FastAPI()
@@ -13,42 +13,45 @@ SOURCE_KEY = "zvicy"
 
 def get_remote_keys():
     try:
-        # 🔥 CACHE BUSTER: Added a timestamp so every request is unique
-        t = int(time.time())
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache=true&v={t}"
-        
-        headers = {"X-Master-Key": API_KEY}
+        # Use a unique timestamp to force JSONBin to give fresh data every second
+        timestamp = int(time.time())
+        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache=true&t={timestamp}"
+        headers = {
+            "X-Master-Key": API_KEY,
+            "X-Bin-Meta": "false" # Tells JSONBin to only send the data, not metadata
+        }
         req = requests.get(url, headers=headers, timeout=10)
-        
         if req.status_code == 200:
-            return req.json().get("record", {})
+            return req.json() # Returns the dict of keys
         return {}
-    except Exception as e:
-        print(f"Error: {e}")
+    except:
         return {}
 
 @app.get("/")
 async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
-    # 🚫 FORCE NO CACHE
+    # 🚫 STOP VERCEL CACHING
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0"
-    response.headers["Expires"] = "0"
     response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
 
+    # 1. Clean the input key (Removes extra spaces)
+    clean_key = key.strip()
+
+    # 2. Get fresh keys from JSONBin
     keys = get_remote_keys()
 
-    # 1. Key Check
-    if key not in keys:
+    # 3. Check Key (Case-Sensitive check)
+    if clean_key not in keys:
         return {
             "success": False,
             "owner": "@Eshucording contact 8123561579",
-            "message": "INVALID KEY"
+            "message": f"INVALID KEY: {clean_key}"
         }
 
-    # 2. Expiry Logic
+    # 4. Check Expiry
     ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
     try:
-        expiry_str = keys[key]
-        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").replace(
+        expiry_date = datetime.strptime(keys[clean_key], "%Y-%m-%d").replace(
             tzinfo=timezone(timedelta(hours=5, minutes=30))
         )
         remaining_days = (expiry_date - ist_now).days + 1
@@ -62,13 +65,13 @@ async def get_data(response: Response, key: str = Query(...), mobile: str = Quer
             "message": "KEY EXPIRED"
         }
 
-    # 3. Gateway Call
+    # 5. Call Source API
     try:
         target_url = f"{SOURCE_API}?key={SOURCE_KEY}&query={mobile}"
         source_res = requests.get(target_url, timeout=15)
         
         if source_res.status_code != 200:
-            return {"success": False, "message": "Gateway Timeout"}
+            return {"success": False, "message": "Gateway Offline"}
 
         source_data = source_res.json()
         source_data["owner"] = "@Eshucording contact 8123561579"
@@ -76,91 +79,5 @@ async def get_data(response: Response, key: str = Query(...), mobile: str = Quer
 
         return source_data
 
-    except:
-        return {"success": False, "message": "Connection Error"}
-            "owner": "@Eshucording contact 8123561579",
-            "message": "INVALID KEY"
-        }
-
-    # 2. Check Expiry
-    ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    try:
-        expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
-            tzinfo=timezone(timedelta(hours=5, minutes=30))
-        )
-        remaining_days = (expiry_date - ist_now).days + 1
-    except:
-        remaining_days = 0
-
-    if remaining_days <= 0:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "KEY EXPIRED"
-        }
-
-    # 3. Call Source API
-    try:
-        target_url = f"{SOURCE_API}?key={SOURCE_KEY}&query={mobile}"
-        source_res = requests.get(target_url, timeout=15)
-        
-        if source_res.status_code != 200:
-            return {"success": False, "message": "Source API Timeout"}
-
-        source_data = source_res.json()
-
-        # 4. Inject Branding
-        source_data["owner"] = "@Eshucording contact 8123561579"
-        source_data["days_remaining"] = f"{remaining_days} Days"
-
-        return source_data
-
     except Exception as e:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "Connection Error"
-        }
-            "message": "INVALID KEY"
-        }
-
-    # 2. Check Expiry
-    ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
-    try:
-        expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
-            tzinfo=timezone(timedelta(hours=5, minutes=30))
-        )
-        remaining_days = (expiry_date - ist_now).days + 1
-    except:
-        remaining_days = 0
-
-    if remaining_days <= 0:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "KEY EXPIRED"
-        }
-
-    # 3. Call Source API (Fixed structure to use 'query' parameter)
-    try:
-        # Changed 'term' to 'query' to match your gateway example
-        target_url = f"{SOURCE_API}?key={SOURCE_KEY}&query={mobile}"
-        response = requests.get(target_url, timeout=15)
-        
-        if response.status_code != 200:
-            return {"success": False, "message": "Source API Down"}
-
-        source_data = response.json()
-
-        # 4. Inject your branding
-        source_data["owner"] = "@Eshucording contact 8123561579"
-        source_data["days_remaining"] = f"{remaining_days} Days"
-
-        return source_data
-
-    except Exception as e:
-        return {
-            "success": False,
-            "owner": "@Eshucording contact 8123561579",
-            "message": "Server Timeout"
-        }
+        return {"success": False, "message": "Connection Timeout"}
