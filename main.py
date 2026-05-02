@@ -8,7 +8,7 @@ app = FastAPI()
 BIN_ID = "69eec211aaba8821973f621a"
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
 
-# Source API Details
+# Source API Details - Update these when the background source changes
 SOURCE_API = "https://gateway.debax.site/api/1"
 SOURCE_AUTH_KEY = "zvicy"  # This is the key the source API actually needs
 OWNER_TAG = "@Eshucording contact 8123561579"
@@ -24,8 +24,8 @@ def get_remote_keys():
         return {}
 
 # --- MAIN API ENDPOINT ---
-@app.get("/")  # Fixed: Changed from "/api/1" to "/" to match your link
-async def get_data(key: str = Query(...), mobile: str = Query(...)): # Fixed: Changed 'query' to 'mobile'
+@app.get("/")  
+async def get_data(key: str = Query(...), mobile: str = Query(...)): 
     keys = get_remote_keys()
 
     # 1. VALIDATE USER'S KEY
@@ -53,9 +53,9 @@ async def get_data(key: str = Query(...), mobile: str = Query(...)): # Fixed: Ch
             "message": "KEY EXPIRED TO BUY CALL 8123561579"
         }
 
-    # 3. FETCH DATA FROM SOURCE (Using correct source key)
+    # 3. FETCH DATA FROM SOURCE (The Bridge)
     try:
-        # Fixed: We map your 'mobile' input to the source's 'query' parameter
+        # This keeps your bot links working even if source changes
         response = requests.get(
             f"{SOURCE_API}?key={SOURCE_AUTH_KEY}&query={mobile}", 
             timeout=10
@@ -66,7 +66,7 @@ async def get_data(key: str = Query(...), mobile: str = Query(...)): # Fixed: Ch
 
         source_data = response.json()
 
-        # 4. RESTRUCTURE OUTPUT
+        # 4. RESTRUCTURE OUTPUT (Same structure always)
         final_response = {
             "owner": OWNER_TAG,
             "days_remaining": f"{remaining_days} Days",
