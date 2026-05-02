@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 app = FastAPI()
 
 # --- CONFIGURATION ---
-BIN_ID = "69eec211aaba8821973f621a"
+BIN_ID = "69f60ccc36566621a818af6b"
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
 
 # Source API Details - Update these when the background source changes
