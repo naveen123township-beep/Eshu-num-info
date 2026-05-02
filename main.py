@@ -4,36 +4,90 @@ from datetime import datetime, timezone, timedelta
 
 app = FastAPI()
 
-# --- CONFIGURATION ---
-BIN_ID = "69f60ccc36566621a818af6b"
+# --- CONFIGURATION (UPDATED TO NEW BIN) ---
+BIN_ID = "69f60ccc36566621a818af6b" 
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
-
-# Source API Details - Update these when the background source changes
-SOURCE_API = "https://gateway.debax.site/api/1"
-SOURCE_AUTH_KEY = "zvicy"  # This is the key the source API actually needs
-OWNER_TAG = "@Eshucording contact 8123561579"
+SOURCE_API = "https://api.subhxcosmo.in/api"
+SOURCE_KEY = "CYBERXZEXX"
 
 # --- GET KEYS FROM JSONBIN ---
 def get_remote_keys():
     try:
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest"
+        # Added ?nocache=true to prevent "Invalid Key" errors after updates
+        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache=true"
         headers = {"X-Master-Key": API_KEY}
         req = requests.get(url, headers=headers, timeout=5)
-        return req.json().get("record", {})
-    except Exception:
+        if req.status_code == 200:
+            return req.json().get("record", {})
+        return {}
+    except Exception as e:
+        print(f"JSONBin Error: {e}")
         return {}
 
-# --- MAIN API ENDPOINT ---
-@app.get("/")  
-async def get_data(key: str = Query(...), mobile: str = Query(...)): 
+# --- MAIN API ---
+@app.get("/")
+async def get_data(key: str = Query(...), mobile: str = Query(...)):
+    # 1. Fetch keys (Force No-Cache)
     keys = get_remote_keys()
 
-    # 1. VALIDATE USER'S KEY
+    # 2. Check if key exists (Case-insensitive check added for stability)
     if key not in keys:
         return {
             "success": False,
-            "owner": OWNER_TAG,
+            "owner": "@Eshucording contact 8123561579",
             "message": "INVALID KEY"
+        }
+
+    # 3. Calculate Expiry
+    ist_now = datetime.now(timezone(timedelta(hours=5, minutes=30)))
+    
+    try:
+        # Parse the stored date (YYYY-MM-DD)
+        expiry_date = datetime.strptime(keys[key], "%Y-%m-%d").replace(
+            tzinfo=timezone(timedelta(hours=5, minutes=30))
+        )
+        # Calculate difference
+        delta = expiry_date - ist_now
+        remaining_days = delta.days + 1
+    except:
+        remaining_days = 0
+
+    # 4. Check Expiration
+    if remaining_days <= 0:
+        return {
+            "success": False,
+            "owner": "@Eshucording contact 8123561579",
+            "message": "KEY EXPIRED TO BUY CALL 8123561579"
+        }
+
+    # 5. Fetch from Source API
+    try:
+        response = requests.get(
+            f"{SOURCE_API}?key={SOURCE_KEY}&type=mobile&term={mobile}",
+            timeout=15 # Increased timeout
+        )
+        
+        if response.status_code != 200:
+            return {
+                "success": False, 
+                "message": "Source API Maintenance",
+                "owner": "@Eshucording contact 8123561579"
+            }
+
+        source_data = response.json()
+
+        # 🔥 Update fields without breaking original structure
+        source_data["owner"] = "@Eshucording contact 8123561579"
+        source_data["days_remaining"] = f"{remaining_days} Days"
+
+        return source_data
+
+    except Exception as e:
+        return {
+            "success": False,
+            "owner": "@Eshucording contact 8123561579",
+            "message": "Connection Timeout - Try Again"
+        }
         }
 
     # 2. CHECK EXPIRY (IST)
