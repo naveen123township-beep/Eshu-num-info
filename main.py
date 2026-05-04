@@ -1,5 +1,95 @@
 from fastapi import FastAPI, Query, Response
+import from fastapi import FastAPI, Query, Response
 import requests
+import time
+from datetime import datetime, timezone
+
+app = FastAPI()
+
+# --- CONFIGURATION ---
+BIN_ID = "69f60ccc36566621a818af6b" 
+API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
+SOURCE_URL = "https://ayush-multi-api.vercel.app/api/num"
+
+def get_remote_keys():
+    """Fetches keys with extra headers to prevent 'Invalid Key' errors."""
+    try:
+        t = int(time.time())
+        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest"
+        headers = {
+            "X-Master-Key": API_KEY,
+            "X-Bin-Meta": "false",
+            "Content-Type": "application/json",
+            "Cache-Control": "no-cache", # Forces JSONBin to give fresh data
+            "Pragma": "no-cache"
+        }
+        # Added params to double-check no cache is used
+        params = {"nocache": t}
+        req = requests.get(url, headers=headers, params=params, timeout=10)
+        
+        if req.status_code == 200:
+            return req.json()
+        else:
+            print(f"Error: {req.status_code}")
+            return {}
+    except Exception as e:
+        print(f"Fetch failed: {e}")
+        return {}
+
+@app.get("/")
+async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
+    # Standard security headers
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    
+    clean_key = key.strip()
+    keys_data = get_remote_keys()
+
+    # 1. Improved Key Check (Check if data is empty first)
+    if not keys_data:
+        return {"success": False, "message": "DATABASE CONNECTION ERROR - TRY AGAIN"}
+
+    if clean_key not in keys_data:
+        return {
+            "success": False, 
+            "owner": "@Eshucording contact 8123561579", 
+            "message": "INVALID KEY"
+        }
+
+    # 2. Expiry Logic
+    expiry_date_str = keys_data[clean_key]
+    try:
+        # Check if the date format is YYYY-MM-DD
+        expiry_date = datetime.strptime(expiry_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        current_time = datetime.now(timezone.utc)
+
+        if current_time > expiry_date:
+            return {
+                "success": False,
+                "message": "KEY EXPIRED. To buy contact @Eshucording or 8123561579"
+            }
+    except:
+        pass
+
+    # 3. Fetch from Original API
+    try:
+        source_res = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
+        if source_res.status_code != 200:
+            return {"success": False, "message": "SOURCE API BUSY"}
+        
+        data = source_res.json()
+
+        # 4. Remove Ayush and add Eshu Codex Branding
+        if isinstance(data, dict):
+            data.pop("developer", None)
+            data["owner"] = "@Eshucording contact 8123561579"
+            data["status"] = "Success"
+            data["valid_until"] = expiry_date_str
+
+        return data
+
+    except Exception:
+        return {"success": False, "message": "INTERNAL SERVER ERROR"}
+
 import time
 from datetime import datetime, timezone
 
