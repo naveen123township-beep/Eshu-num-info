@@ -4,36 +4,58 @@ import time
 
 app = FastAPI()
 
-# --- CONFIGURATION ---
+# --- CONFIG ---
 BIN_ID = "69f60ccc36566621a818af6b" 
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
-# The original working API
 SOURCE_URL = "https://anon-num-info.vercel.app/num?key=num3004"
 MY_DETAILS = "@Eshucording contact 8123561579"
 
-def get_keys():
-    try:
-        # Force a fresh fetch from the database every time
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={int(time.time())}"
-        headers = {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"}
-        req = requests.get(url, headers=headers, timeout=10)
-        if req.status_code == 200:
-            return req.json()
-        return {}
-    except:
-        return {}
-
 @app.get("/")
 async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
-    # Disable caching so new keys work immediately
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     
-    all_keys = get_keys()
+    # 1. Fetch fresh data from JSONBin
+    try:
+        t = int(time.time())
+        db_url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={t}"
+        headers = {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"}
+        db_res = requests.get(db_url, headers=headers, timeout=10)
+        all_keys = db_res.json()
+        
+        # If JSONBin returns a list or a nested 'record'
+        if isinstance(all_keys, dict) and "record" in all_keys:
+            all_keys = all_keys["record"]
+            
+    except Exception as e:
+        return {"success": False, "message": "Database Error", "error": str(e)}
 
-    # 1. Check if the key exists in your JSON database
+    # 2. Direct Key Check
     if key not in all_keys:
         return {
             "success": False, 
+            "owner": MY_DETAILS, 
+            "message": f"INVALID KEY. Contact {MY_DETAILS}",
+            "debug_received_key": key
+        }
+
+    # 3. Fetch from Original API
+    try:
+        # Use mobile parameter for the source
+        source_res = requests.get(f"{SOURCE_URL}&num={mobile}", timeout=15)
+        data = source_res.json()
+
+        if "response" in data:
+            # Swap developer for your branding
+            data.pop("developer", None)
+            data["owner"] = MY_DETAILS
+            data["status"] = "Success"
+            data["key_used"] = key
+            return data
+        
+        return {"success": False, "message": "Number not found in source database."}
+
+    except:
+        return {"success": False, "message": "Source API Connection Failed"}
             "owner": MY_DETAILS, 
             "message": f"INVALID KEY. Contact {MY_DETAILS} to buy."
         }
