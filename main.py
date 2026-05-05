@@ -1,39 +1,60 @@
 from fastapi import FastAPI, Query, Response
 import requests
 import time
-from datetime import datetime, timezone, timedelta
 
 app = FastAPI()
 
 # --- CONFIGURATION ---
 BIN_ID = "69f60ccc36566621a818af6b" 
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
-# The original API provided by you
+# The original working API
 SOURCE_URL = "https://anon-num-info.vercel.app/num?key=num3004"
 MY_DETAILS = "@Eshucording contact 8123561579"
 
 def get_keys():
     try:
-        # Using timestamp to prevent caching issues which causes "Invalid Key"
-        t = int(time.time())
-        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={t}"
+        # Force a fresh fetch from the database every time
+        url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={int(time.time())}"
         headers = {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"}
         req = requests.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
-            data = req.json()
-            # Handle both dictionary and list formats from JSONBin
-            return data.get("record", data) if isinstance(data, dict) else {}
+            return req.json()
         return {}
     except:
         return {}
 
 @app.get("/")
 async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
-    # Standard headers to prevent browser caching
-    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    # Disable caching so new keys work immediately
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
     
-    clean_key = key.strip()
     all_keys = get_keys()
+
+    # 1. Check if the key exists in your JSON database
+    if key not in all_keys:
+        return {
+            "success": False, 
+            "owner": MY_DETAILS, 
+            "message": f"INVALID KEY. Contact {MY_DETAILS} to buy."
+        }
+
+    # 2. Key is valid, now fetch from the original source API
+    try:
+        # Forward the request using the source's required internal key
+        source_res = requests.get(f"{SOURCE_URL}&num={mobile}", timeout=15)
+        data = source_res.json()
+
+        # 3. Rebrand: Remove their developer link and add yours
+        if "response" in data:
+            data.pop("developer", None) # Remove original dev
+            data["owner"] = MY_DETAILS    # Add your branding
+            data["status"] = "Success"
+            return data
+        
+        return {"success": False, "message": "No data found for this number."}
+
+    except Exception:
+        return {"success": False, "message": "Original API is currently down."}
 
     # 1. KEY VALIDATION
     if clean_key not in all_keys:
