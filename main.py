@@ -8,20 +8,18 @@ app = FastAPI()
 # --- CONFIGURATION ---
 BIN_ID = "69f60ccc36566621a818af6b" 
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
-SOURCE_URL = "https://ayush-multi-api.vercel.app/api/num"
+# The new API you provided
+SOURCE_URL = "https://anon-num-info.vercel.app/num?key=num3004"
 MY_DETAILS = "@Eshucording contact 8123561579"
 
 def get_keys():
     try:
-        # Use timestamp to bypass JSONBin caching
         t = int(time.time())
         url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={t}"
         headers = {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"}
         req = requests.get(url, headers=headers, timeout=10)
-        
         if req.status_code == 200:
             data = req.json()
-            # Forces retrieval of the actual key dictionary even if wrapped
             return data.get("record", data) if isinstance(data, dict) else {}
         return {}
     except:
@@ -29,181 +27,47 @@ def get_keys():
 
 @app.get("/")
 async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
-    # Block browser caching
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     
     clean_key = key.strip()
     all_keys = get_keys()
 
-    # 1. KEY VALIDATION
+    # 1. Check Key
     if clean_key not in all_keys:
-        return {
-            "success": False, 
-            "owner": MY_DETAILS, 
-            "message": "INVALID KEY"
-        }
+        return {"success": False, "owner": MY_DETAILS, "message": "INVALID KEY"}
 
-    # 2. EXPIRY CHECK
+    # 2. Check Expiry
     expiry_str = all_keys[clean_key]
     try:
         expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
         ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
-
         if ist_now > expiry_date:
-            return {
-                "success": False,
-                "owner": MY_DETAILS,
-                "message": f"KEY EXPIRED. To buy key contact {MY_DETAILS}"
-            }
+            return {"success": False, "owner": MY_DETAILS, "message": f"KEY EXPIRED. Contact {MY_DETAILS}"}
     except:
         pass
 
-    # 3. FETCH WITH CORRECT PARAMETER (term)
+    # 3. Fetch from new API (using 'num' parameter)
     try:
-        # Fixed: using 'term' instead of 'query'
-        res = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
-        data = res.json()
+        res = requests.get(f"{SOURCE_URL}&num={mobile}", timeout=15)
+        raw_data = res.json()
 
-        # 4. REBRAND OUTPUT
-        if isinstance(data, dict):
-            data.pop("developer", None) # Remove Ayush credit
-            data["owner"] = MY_DETAILS
-            data["status"] = "Success"
-            data["expiry"] = expiry_str
-
-        return data
+        # 4. Rebrand and Format Output
+        if "response" in raw_data:
+            # Redact sensitive IDs if present in the data list
+            if "data" in raw_data["response"]:
+                for item in raw_data["response"]["data"]:
+                    if "aadhar" in item and item["aadhar"]:
+                        item["aadhar"] = "[Aadhaar Redacted]"
+            
+            # Remove original developer and add yours
+            raw_data.pop("developer", None)
+            raw_data["owner"] = MY_DETAILS
+            raw_data["status"] = "Success"
+            raw_data["key_expiry"] = expiry_str
+            
+            return raw_data
+        
+        return {"success": False, "message": "NO DATA FOUND"}
 
     except Exception:
-        return {"success": False, "message": "ORIGINAL API ERROR"}
-
-    # 1. Check if key exists
-    if user_key not in keys_data:
-        return {"success": False, "owner": CONTACT, "message": "INVALID KEY"}
-
-    # 2. Expiry Check
-    expiry_str = keys_data[user_key]
-    try:
-        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
-        ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
-
-        if ist_now > expiry_date:
-            return {"success": False, "owner": CONTACT, "message": f"KEY EXPIRED. Buy: {CONTACT}"}
-    except:
-        pass
-
-    # 3. Fetch from Ayush API and Rebrand
-    try:
-        res = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
-        data = res.json()
-        if isinstance(data, dict):
-            data.pop("developer", None)
-            data["owner"] = CONTACT
-            data["status"] = "Success"
-            data["expiry"] = expiry_str
-        return data
-    except:
-        return {"success": False, "message": "API SERVER BUSY"}
-    # 1. Validation
-    if input_key not in db_keys:
-        return {"success": False, "owner": CONTACT, "message": "INVALID KEY"}
-
-    # 2. Expiry Check (IST Time)
-    expiry_str = db_keys[input_key]
-    try:
-        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
-        ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
-
-        if ist_now > expiry_date:
-            return {
-                "success": False, 
-                "owner": CONTACT, 
-                "message": f"KEY EXPIRED. To buy contact {CONTACT}"
-            }
-    except:
-        pass # If date format error, allow access
-
-    # 3. Data Fetching
-    try:
-        res = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
-        final_data = res.json()
-        
-        if isinstance(final_data, dict):
-            final_data.pop("developer", None) # Remove Ayush
-            final_data["owner"] = CONTACT # Add Eshu
-            final_data["status"] = "Success"
-            final_data["key_expiry"] = expiry_str
-            
-        return final_data
-    except:
-        return {"success": False, "message": "ORIGINAL API ERROR"}
-
-    # --- 1. CRITICAL KEY CHECK ---
-    if user_key not in all_keys:
-        return {"success": False, "owner": CONTACT, "message": "INVALID KEY"}
-
-    # --- 2. EXPIRY CHECK ---
-    expiry_str = all_keys[user_key]
-    try:
-        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
-        ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
-
-        if ist_now > expiry_date:
-            return {
-                "success": False, 
-                "owner": CONTACT, 
-                "message": f"KEY EXPIRED. To buy contact {CONTACT}"
-            }
-    except:
-        pass
-
-    # --- 3. FETCH AND CLEAN DATA ---
-    try:
-        source_call = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
-        source_data = source_call.json()
-
-        if isinstance(source_data, dict):
-            # Remove developer and rebrand
-            source_data.pop("developer", None)
-            source_data["owner"] = CONTACT
-            source_data["status"] = "Success"
-            source_data["valid_until"] = expiry_str
-            
-        return source_data
-    except:
-        return {"success": False, "message": "ORIGINAL API ERROR"}
-
-    # --- THE KEY CHECK ---
-    if user_key not in all_keys:
-        return {"success": False, "owner": CONTACT, "message": "INVALID KEY"}
-
-    # --- EXPIRY CHECK ---
-    expiry_str = all_keys[user_key]
-    try:
-        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
-        # Get Current Date in IST
-        ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
-
-        if ist_now > expiry_date:
-            return {
-                "success": False, 
-                "owner": CONTACT, 
-                "message": f"KEY EXPIRED. To buy contact {CONTACT}"
-            }
-    except:
-        pass # If date format is wrong, let them through
-
-    # --- FETCH ORIGINAL DATA ---
-    try:
-        api_call = requests.get(f"{SOURCE_URL}?term={mobile}", timeout=10)
-        data = api_call.json()
-
-        # Remove original dev and add yours
-        if isinstance(data, dict):
-            data.pop("developer", None)
-            data["owner"] = CONTACT
-            data["status"] = "Success"
-            data["valid_until"] = expiry_str
-
-        return data
-    except:
-        return {"success": False, "message": "ORIGINAL API ERROR"}
+        return {"success": False, "message": "SOURCE API DOWN"}
