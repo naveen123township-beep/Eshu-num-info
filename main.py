@@ -8,18 +8,20 @@ app = FastAPI()
 # --- CONFIGURATION ---
 BIN_ID = "69f60ccc36566621a818af6b" 
 API_KEY = "$2a$10$e7Ap4ivHIhQer/PSEZXQmO.PO.oafbEncIR6ZIgQmGqCTBUm3b25W"
+# The original API provided by you
 SOURCE_URL = "https://anon-num-info.vercel.app/num?key=num3004"
-# Your branding details for expired keys
 MY_DETAILS = "@Eshucording contact 8123561579"
 
 def get_keys():
     try:
+        # Using timestamp to prevent caching issues which causes "Invalid Key"
         t = int(time.time())
         url = f"https://api.jsonbin.io/v3/b/{BIN_ID}/latest?nocache={t}"
         headers = {"X-Master-Key": API_KEY, "X-Bin-Meta": "false"}
         req = requests.get(url, headers=headers, timeout=10)
         if req.status_code == 200:
             data = req.json()
+            # Handle both dictionary and list formats from JSONBin
             return data.get("record", data) if isinstance(data, dict) else {}
         return {}
     except:
@@ -27,13 +29,46 @@ def get_keys():
 
 @app.get("/")
 async def get_data(response: Response, key: str = Query(...), mobile: str = Query(...)):
+    # Standard headers to prevent browser caching
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     
     clean_key = key.strip()
     all_keys = get_keys()
 
-    # 1. Check if Key exists in your database
+    # 1. KEY VALIDATION
     if clean_key not in all_keys:
+        return {"success": False, "owner": MY_DETAILS, "message": "INVALID KEY"}
+
+    # 2. EXPIRY CHECK
+    expiry_str = all_keys[clean_key]
+    try:
+        expiry_date = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+        ist_now = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).date()
+        if ist_now > expiry_date:
+            return {"success": False, "owner": MY_DETAILS, "message": f"KEY EXPIRED. Contact {MY_DETAILS}"}
+    except:
+        pass
+
+    # 3. CONNECT TO ORIGINAL API
+    try:
+        # Sending request to the original source with the correct 'num' parameter
+        res = requests.get(f"{SOURCE_URL}&num={mobile}", timeout=15)
+        raw_data = res.json()
+
+        # 4. SWAP DEVELOPER DETAILS
+        if "response" in raw_data:
+            # We remove the original developer and insert your branding
+            raw_data.pop("developer", None)
+            raw_data["owner"] = MY_DETAILS
+            raw_data["status"] = "Success"
+            raw_data["key_expiry"] = expiry_str
+            
+            return raw_data
+        
+        return {"success": False, "message": "NO DATA FOUND FROM SOURCE"}
+
+    except Exception:
+        return {"success": False, "message": "ORIGINAL API CONNECTION ERROR"}
         return {
             "success": False, 
             "owner": MY_DETAILS, 
